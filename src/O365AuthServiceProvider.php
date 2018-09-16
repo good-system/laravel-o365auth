@@ -1,6 +1,6 @@
 <?php
 
-namespace Singingfox\O365Auth;
+namespace GoodSystem\O365Auth;
 
 use Illuminate\Support\ServiceProvider;
 
@@ -24,7 +24,7 @@ class O365AuthServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $this->app->make('Singingfox\O365Auth\OAuthController');
+        $this->app->make('GoodSystem\O365Auth\OAuthController');
         $this->mergeConfigFrom(__DIR__.'/config.php', 'O365Auth');
     }
 }

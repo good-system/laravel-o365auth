@@ -1,6 +1,6 @@
 <?php
 
-namespace Singingfox\O365Auth;
+namespace GoodSystem\O365Auth;
 
 use App\Http\Controllers\Controller;
 use App\User;

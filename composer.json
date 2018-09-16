@@ -1,0 +1,13 @@
+{
+    "name": "good-system/laravel-o365auth",
+    "authors": [
+        {
+            "name": "Harry Guo"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+        "league/oauth2-client": "^2.3",
+        "microsoft/microsoft-graph": "^1.3"
+    }
+}

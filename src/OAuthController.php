@@ -40,7 +40,7 @@ class OAuthController extends Controller
             $user = $this->findOrCreateUser($this->getAuthenticatedUserdataOrAbort());
             // Log in user manually at this point
             Auth::login($user);
-            return redirect(session('URL_BEFORE_AUTH') ?? '/');
+            return redirect(session('URL_BEFORE_AUTH') ?? '/')->with('user', $user);
 
         } catch (\Exception $e) {
             abort(500, "Office 365 token not obtained.  Authentication aborted.  Error: " . $e->getMessage());

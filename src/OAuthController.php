@@ -7,12 +7,13 @@ use App\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use League\OAuth2\Client\Provider\GenericProvider as OAuth2Provider;
 use League\OAuth2\Client\Token\AccessToken;
 use Microsoft\Graph\Graph;
 
 class OAuthController extends Controller
 {
+    use OAuthTrait;
+    
     // 1.  User click on a link to initiate authentication flow via Microsoft Graph (Office 365)
     public function init(Request $request)
     {
@@ -43,30 +44,8 @@ class OAuthController extends Controller
             return redirect(session('URL_BEFORE_AUTH') ?? '/')->with('user', $user);
 
         } catch (\Exception $e) {
-            abort(500, "Office 365 token not obtained.  Authentication aborted.  Error: " . $e->getMessage());
+            $this->abortOAuth(500, "Office 365 token not obtained.  Authentication aborted.  Error: " . $e->getMessage());
         }
-    }
-
-    protected function getOAuthProvider()
-    {
-        // define these 3 in project_root/.env
-        $clientId = env('O365_CLIENT_ID');
-        $clientSecret = env('O365_CLIENT_SECRET');
-        $redirectUrl = env('O365_REDIRECT_URL');
-        if (!$clientId || !$clientSecret || !$redirectUrl) {
-            abort(500, 'Office 365 authentication parameters are not provided. Authentication aborted.');
-        }
-
-        return new OAuth2Provider([
-            'clientId'                => $clientId,
-            'clientSecret'            => $clientSecret,
-            'redirectUri'             => $redirectUrl,
-            // these 3 are defined in config.php of this package project
-            'urlAuthorize'            => config('O365Auth.baseUrl') . config('O365Auth.authorizeUrl'),
-            'urlAccessToken'          => config('O365Auth.baseUrl') . config('O365Auth.tokenUrl'),
-            'scopes'                  => config('O365Auth.scopes'),
-            'urlResourceOwnerDetails' => ''
-        ]);
     }
 
     protected function getAuthCodeOrAbort()
@@ -74,14 +53,13 @@ class OAuthController extends Controller
         if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['code'])) {
             return $_GET['code'];
         }
-        abort(500, 'Invalid authorization code.');
+        $this->abortOAuth(500, 'Invalid authorization code.');
     }
 
     protected function matchStateOrAbort()
     {
         if (empty($_GET['state']) || ($_GET['state'] !== session('O365_AUTH_STATE'))){
-            session(['O365_AUTH_STATE' => '']);
-            abort(500, 'Authentication state not matched.  Aborted.');
+            $this->abortOAuth(500, 'Authentication state not matched.  Aborted.');
         }
     }
 
@@ -101,18 +79,19 @@ class OAuthController extends Controller
             $this->matchDomainOrAbort($userData);
             return $userData;
         } catch (\Exception $e) {
-            abort(500, 'User information not retrieved.  Authentication failed. ' . $e->getMessage());
+            $this->abortOAuth(500, 'User information not retrieved.  Authentication failed. ' . $e->getMessage());
         }
     }
 
     protected function getAccessTokenOrAbort()
     {
-        $oAuthProvider = $this->getOAuthProvider();
-        $accessToken = $oAuthProvider->getAccessToken('authorization_code', ['code' => $_GET['code']]);
-        $token = $accessToken->getToken();
-        if (! $token) {
-            abort(500, "Office 365 access token doesn't exist.  User info cannot be retrieved.");
+        if (! $token = $this->getAccessToken()) {
+            $this->abortOAuth(500, "Office 365 access token doesn't exist.  User info cannot be retrieved.");
         }
+
+        // If a valid token is retrieved, put it in session for later use, for example, allowing user to upload file.
+        session(['access_token' => $token]);
+
         return $token;
     }
 
@@ -120,7 +99,7 @@ class OAuthController extends Controller
     {
         $domain = strtolower(trim(env('O365_DOMAIN')));
         if (! $domain || ! ends_with($userData['email'], $domain)) {
-            abort(404, "Authentication failed.  User email is on a domain that can not yet be authenticated this way.");
+            $this->abortOAuth(404, "Authentication failed.  User email is on a domain that can not yet be authenticated this way.");
         }
     }
 
@@ -141,9 +120,16 @@ class OAuthController extends Controller
                 $user->save();
             }
         } else {
-            abort(500, 'Looking up in or adding user to our system was not successful. Authentication failed.');
+            $this->abortOAuth(500, 'Looking up in or adding user to our system was not successful. Authentication failed.');
         }
 
         return $user;
+    }
+
+    //
+    protected function abortOAuth($code, $message)
+    {
+        session(['O365_AUTH_STATE' => '']);
+        abort($code, $message);
     }
 }

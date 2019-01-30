@@ -1,108 +1,74 @@
 # Office 365 PHP Auth
 
-This package adds authenticate against Office 365 to a Laravel application.
+This package allows a Laravel application to authenticate users using their Office 365 accounts.
 
-The package is largely based on program logic from [`microsoftgraph/php-connect-sample`](https://github.com/microsoftgraph/php-connect-sample), but aimed to easier integration with Laravel 5, and utilized more Laravel native things.
+The package is largely based on program logic from [`microsoftgraph/php-connect-sample`](https://github.com/microsoftgraph/php-connect-sample), but aims to easier integration with Laravel 5, and utilized more Laravel specific things.
 
-## Expected Behaviors
+## Prerequisite
 
-- Failed authentication of an Office 365 account won't be granted access -- 500 error
-- Successful authentication of an Office 365 account that doesn't belong to the specified domain won't be granted access -- 404 error
-- Upon a successful authentication with an Office 365 account that is on the specified domain, user is redirected to the previous page, or to site root URL.  
-- If the successfully authenticated user is NOT in the system, the user would be added
-- New user or existing user, if successfully authenticated, will be able to bypass email verification (verification flag will be set manually)
+### Microsoft Application and `.env`
 
-## Installation and essential configurations
-
-### Install package with Composer 
-
-**(NOTE: packagist not updated yet, the following may not work)**
-
-First, run `composer require singingfox/o365auth` under Laraval application root directory.
-
-Add the following to `composer.json`
-
-`Singingfox\\O365Auth\\": "vendor/singingfox/o365auth/src`
-
-Add the following to `config/app.php`
-
-`Singingfox\O365Auth\O365AuthServiceProvider::class,`
-
-Run 
-
-`composer dump-autoload`
-
-Alternatively, add then following to `composer.json` then run `composer update`
+Create an application at https://apps.dev.microsoft.com.  And add the following to .env file with the application's parameters.
 
 ```
-"required": [
-    ...
-    "singingfox/o365auth": "*"
-],
-```
- 
-#### Dependencies
-
-When installing this package, the following packages and their dependencies are going to be pulled in as well. 
-
-```
-"league/oauth2-client": "^2.3.*",
-"microsoft/microsoft-graph": "^1.3.*"
-```
-
-### Configurations
-
-#### Office 365 parameters needed in Laravel .env
-     
-Add the following to .env file 
-
-```
-O365_DOMAIN=ALLOWED-EMAIL-DOMAIN-NAME
+# If any of the following is missing, authentication will fail.
+O365_DOMAIN=ALLOWED-EMAIL-DOMAIN-NAMES,SEPARATED-BY-COMMA
 O365_CLIENT_ID=YOUR-APPLICATION-ID-OR-CLIENT-ID-IN-CREATED-MICROSOFT-APPLICATION
 O365_CLIENT_SECRET=YOUR-CLIENT-SECRETE-OR-CLIENT-PASSWORD-IN-CREATED-MICROSOFT-APPLICATION
-# This needs to be the full URL (https)
+# This needs to be the full URL (https). 
 O365_REDIRECT_URL=YOUR-REDIRECT-URL-IN-CREATED-MICROSOFT-APPLICATION
 ```
 
-If not specified, a successful authentication will attempt to redirect application to the URL immediately prior to the authentication, or fall back to web root "/".
+### User Model
 
-#### Display specific errors 
+This package will be looking for a Laravel model `\User`.  This could be an alias of `App\User` or other user class such as `GoodSystem\User`, explicitly set in the application.
 
-Add a new view `resources/views/errors/500.blade.php`.  The content could be as simple as 
+## Installation
 
-```html
-<h1>{{ $exception->getMessage() }}</h1>
-```
+Run `composer require good-system/o365auth` under Laraval application root directory.
 
-This is optional, but if done, specific error message from this package, could be displayed.  Otherwise, the following generic error message will be displayed for all errors:
+Laravel (5.6 and newer) should "discover" the package, without having to add service provider to `config/app.php`.
+    
+### Required Laravel Version
+
+This package might work with Laravel framework before 5.7, it's not been tested.
+
+## Error Page Templates  
+
+Error templates in package will be looked up and used if exist.  Otherwise, fall back to default Laravel error display.
+
+## Expected Behaviors
+
+### Default Routes
+
+Two default routes are provided: 
+
+- `/o365auth/init`
+- `/o365auth/redirect`
+
+Users should always start at `/o365auth/init`, and then expect to be redirected to Office 365 authentication page at `https://login.microsoftonline.com/common/oauth2/v2.0/authorize`, with parameters.
  
-`Whoops, looks like something went wrong.`
+### 1. Happy Scenario
 
-## What to do after authentication
+Upon successful authentication with an Office 365 account on any of the domains specified by "O365_DOMAIN" in `.env`,
 
-At this time, the built-in program logic try to 
+- if not exists in the system, and user model is configured properly, user record is added to the system (retrieved if already exists)
+- system access is granted (Laravel manual authentication)
+- user is finally redirected to the previous page or web root `/` (it doesn't have anything to do with "O365_REDIRECT_URL" in `.env`)
+- Both new user and existing user will be able to bypass email verification, if not yet verified (verification flag will be set manually)
 
-The following is a sample of what can be done after successful authentication:
+### 2. Laravel Authentication Error
 
-1. Retrieve `access_token` as stored in session
-2. Initialize a `Graph` object, and assign the token to it
-3. Now we should be able to call all kinds of Graph API endpoints and do whatever we need to do
-4. Optionally, `O365_AFTER_AUTH_URL` can be specified in `.env` under Laraval application root, then a successful authentication process would be followed by some immediate actions, such as setting authenticated user locally, etc.  The following sample route doesn't really do that.  It only illustrates how to get a piece of user info -- email.
+If above #2 fails, which is unlikely, expect the system to throw a `500` error -- something really unexpected.
 
-```php
-Route::get("/o365-user/email", function () {
-    if (session_status() == PHP_SESSION_NONE)
-        session_start();
+### 3. User Model Error
 
-    $graph = new \Microsoft\Graph\Graph();
-    $graph->setAccessToken($_SESSION['access_token']);
+If above #1 fails due to bad configuration for user model, which is possible (but not expected), or some unknown error while adding user to system, also expect system to throw a `500` error.
 
-    $me = $graph->createRequest("get", "/me")
-        ->setReturnType(\Microsoft\Graph\Model\User::class)
-        ->execute();
+### 4. Bad Data Coming from Microsoft
 
-    return $me->getMail();
-});
-```
+Could be one of the several scenarios.
+  
+### 5. Email Not on The Allowed Domains List
 
-This authentication process can also be used to register new users that allows for access.
+Expect the system to throw a `403` error.

@@ -12,17 +12,13 @@ class OAuthController extends Controller
 {
     use OAuthTrait;
 
-    public function __construct()
+    // 1.  User click on a link to initiate authentication flow via Microsoft Graph (Office 365)
+    public function init(Request $request)
     {
         if (! class_exists('\User')) {
             // #3
             $this->abortOAuth(500, 'User model not found.');
         }
-    }
-
-    // 1.  User click on a link to initiate authentication flow via Microsoft Graph (Office 365)
-    public function init(Request $request)
-    {
 
         $oAuthProvider = $this->getOAuthProvider();
         $authorizationUrl = $oAuthProvider->getAuthorizationUrl();

@@ -15,7 +15,7 @@ class OAuthController extends Controller
     // 1.  User click on a link to initiate authentication flow via Microsoft Graph (Office 365)
     public function init(Request $request)
     {
-        if (! class_exists('\User')) {
+        if (! class_exists('\O365User')) {
             // #3
             $this->abortOAuth(500, 'User model not found.');
         }
@@ -121,13 +121,13 @@ class OAuthController extends Controller
 
     private function findOrCreateUser(array $userData)
     {
-        $user = \User::where('email', $userData['email'])->first();
+        $user = \O365User::where('email', $userData['email'])->first();
 
         $timestamp = date('Y-m-d H:i:s');
 
         if (! $user) {
             // email_verified_at is added in Laravel 5.7.  It is ignored if the field doesn't exist for older version of Laravel
-            $user = \User::create(array_merge($userData, ['email_verified_at' => $timestamp, 'password' => Hash::make(str_random())]));
+            $user = \O365User::create(array_merge($userData, ['email_verified_at' => $timestamp, 'password' => Hash::make(str_random())]));
         }
 
         if ($user) {

@@ -21,7 +21,7 @@ O365_REDIRECT_URL=YOUR-REDIRECT-URL-IN-CREATED-MICROSOFT-APPLICATION
 
 ### User Model
 
-This package will be looking for a Laravel model `\User`.  This could be an alias of `App\User` or other user class such as `GoodSystem\User`, explicitly set in the application.
+This package will be looking for a Laravel model `\O365User`.  This could be an alias of `App\User` or other user class such as `GoodSystem\User`, explicitly set in the application.
 
 ## Installation
 

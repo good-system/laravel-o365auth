@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Microsoft\Graph\Graph;
+use Illuminate\Support\Str;
 
 class OAuthController extends Controller
 {
@@ -53,11 +54,10 @@ class OAuthController extends Controller
 
     private function getAuthCodeOrAbort()
     {
-        if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['code'])) {
-            return $_GET['code'];
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET' && isset($_GET['code'])) {
+            // #4
+            $this->abortOAuth(500, 'Invalid authorization code.');
         }
-        // #4
-        $this->abortOAuth(500, 'Invalid authorization code.');
     }
 
     private function matchStateOrAbort()
@@ -73,6 +73,7 @@ class OAuthController extends Controller
         try {
             $graph = new Graph();
             $token = $this->getAccessTokenOrAbort();
+
             $authenticatedUser = $graph->setAccessToken($token)
                 ->createRequest("get", "/me")
                 ->setReturnType(\Microsoft\Graph\Model\User::class)
@@ -91,7 +92,8 @@ class OAuthController extends Controller
 
     private function getAccessTokenOrAbort()
     {
-        if (! ($token = $this->getAccessToken())) {
+        $token = $this->getAccessToken();
+        if (empty($token)) {
             // #4
             $this->abortOAuth(500, "Office 365 access token doesn't exist.  User info cannot be retrieved.");
         }
@@ -107,7 +109,7 @@ class OAuthController extends Controller
         if ($domainsStr) {
             $domains = explode(',', $domainsStr);
             foreach ($domains as $domain) {
-                if (ends_with($userData['email'], trim($domain))) {
+                if (Str::endsWith($userData['email'], trim($domain))) {
                     $matched = true;
                 }
             }
